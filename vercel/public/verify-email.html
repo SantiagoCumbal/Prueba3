@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verificación de Email - PetAdopt</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+            background: linear-gradient(135deg, #FF8C42 0%, #FF6B35 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 24px;
+            padding: 48px;
+            max-width: 500px;
+            width: 100%;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            text-align: center;
+        }
+
+        .icon {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 24px;
+            background: rgba(255, 140, 66, 0.1);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .icon.success {
+            background: rgba(76, 175, 80, 0.1);
+            animation: scaleIn 0.5s ease-out;
+        }
+
+        .icon.error {
+            background: rgba(244, 67, 54, 0.1);
+        }
+
+        @keyframes scaleIn {
+            0% { transform: scale(0); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+
+        .icon svg {
+            width: 48px;
+            height: 48px;
+        }
+
+        .paw-print {
+            font-size: 48px;
+        }
+
+        h1 {
+            color: #2D3561;
+            font-size: 28px;
+            margin-bottom: 16px;
+            font-weight: 700;
+        }
+
+        p {
+            color: #757575;
+            font-size: 16px;
+            line-height: 1.6;
+            margin-bottom: 32px;
+        }
+
+        .button {
+            background: linear-gradient(135deg, #FF8C42 0%, #FF6B35 100%);
+            color: white;
+            border: none;
+            padding: 16px 48px;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            box-shadow: 0 4px 12px rgba(255, 140, 66, 0.3);
+        }
+
+        .button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(255, 140, 66, 0.4);
+        }
+
+        .button:active {
+            transform: translateY(0);
+        }
+
+        .button:disabled {
+            background: #b2bec3;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .loader {
+            border: 4px solid rgba(255, 140, 66, 0.2);
+            border-top: 4px solid #FF8C42;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div id="loading" class="loading-state">
+            <div class="icon">
+                <div class="loader"></div>
+            </div>
+            <h1>Verificando tu email...</h1>
+            <p>Por favor espera mientras confirmamos tu cuenta en PetAdopt.</p>
+        </div>
+
+        <div id="success" class="hidden">
+            <div class="icon success">
+                <div class="paw-print">🐾</div>
+            </div>
+            <h1>¡Email verificado!</h1>
+            <p>Tu cuenta ha sido verificada correctamente. Ya puedes iniciar sesión en PetAdopt y comenzar a buscar tu compañero perfecto.</p>
+            <button class="button" onclick="openApp()">Abrir PetAdopt</button>
+        </div>
+
+        <div id="error" class="hidden">
+            <div class="icon error">
+                <svg fill="#F44336" viewBox="0 0 24 24">
+                    <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z"/>
+                </svg>
+            </div>
+            <h1>Error en la verificación</h1>
+            <p id="error-message">Hubo un problema al verificar tu email. El enlace puede haber expirado o ya fue usado.</p>
+            <button class="button" onclick="openApp()">Ir a PetAdopt</button>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.0/dist/umd/supabase.js"></script>
+    <script>
+        let supabase;
+
+        // Cargar configuración de Supabase
+        async function initSupabase() {
+            try {
+                const response = await fetch('/api/config');
+                const config = await response.json();
+                
+                supabase = window.supabase.createClient(
+                    config.supabaseUrl,
+                    config.supabaseAnonKey
+                );
+                
+                console.log('Supabase inicializado');
+                verifyEmail();
+            } catch (error) {
+                console.error('Error inicializando Supabase:', error);
+                showError('Error al cargar la configuración');
+            }
+        }
+
+        async function verifyEmail() {
+            try {
+                console.log("URL completa:", window.location.href);
+                console.log("Hash:", window.location.hash);
+                console.log("Search:", window.location.search);
+
+                const hashParams = new URLSearchParams(window.location.hash.substring(1));
+                const queryParams = new URLSearchParams(window.location.search);
+
+                // Obtener token y type del hash
+                const token = hashParams.get('token') || queryParams.get('token');
+                const type = hashParams.get('type') || queryParams.get('type');
+
+                console.log('Token encontrado:', { token: !!token, type });
+
+                if (!token) {
+                    showError('Enlace de verificación inválido o expirado');
+                    return;
+                }
+
+                // Verificar el token con Supabase usando token_hash
+                console.log('Verificando email con token_hash...');
+                const { data, error } = await supabase.auth.verifyOtp({
+                    token_hash: token,
+                    type: type || 'signup'
+                });
+
+                console.log('Resultado verificación:', { data, error });
+
+                if (error) {
+                    console.error('Error en verificación:', error);
+                    throw error;
+                }
+
+                if (data.session || data.user) {
+                    console.log('Email verificado exitosamente');
+                    showSuccess();
+                } else {
+                    showError('No se pudo verificar el email');
+                }
+
+            } catch (error) {
+                console.error('Error al verificar email:', error);
+                showError(error.message || 'Error al verificar tu email. El enlace puede haber expirado.');
+            }
+        }
+
+        function showSuccess() {
+            document.getElementById('loading').classList.add('hidden');
+            document.getElementById('success').classList.remove('hidden');
+        }
+
+        function showError(message) {
+            document.getElementById('loading').classList.add('hidden');
+            document.getElementById('error-message').textContent = message;
+            document.getElementById('error').classList.remove('hidden');
+        }
+
+        function openApp() {
+            // Deep link a la aplicación Flutter
+            window.location.href = 'petadopt://verified';
+            // Fallback después de 2 segundos
+            setTimeout(() => {
+                window.location.href = 'about:blank';
+                window.close();
+            }, 2000);
+        }
+
+        // Inicializar cuando cargue la página
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initSupabase);
+        } else {
+            initSupabase();
+        }
+    </script>
+</body>
+</html>
