@@ -1,0 +1,941 @@
+================================================================================
+                    DOCUMENTACIÓN DE ARQUITECTURA
+                         PETADOPT - FLUTTER APP
+================================================================================
+
+VERSIÓN: 1.0.0
+ÚLTIMA ACTUALIZACIÓN: 6 de Enero, 2026
+PATRÓN DE ARQUITECTURA: Clean Architecture + Riverpod
+BASE DE DATOS: Supabase (PostgreSQL)
+AUTENTICACIÓN: Supabase Auth con verificación de email
+
+================================================================================
+                         1. ARQUITECTURA GENERAL
+================================================================================
+
+El proyecto sigue los principios de CLEAN ARCHITECTURE propuestos por Robert C. Martin.
+La arquitectura se divide en 3 capas principales:
+
+┌─────────────────────────────────────────────────────────────────┐
+│                      PRESENTATION LAYER                          │
+│  (UI, Widgets, Pages, Providers, State Management)              │
+│  - Maneja la interacción con el usuario                         │
+│  - Muestra datos y recibe inputs                                │
+│  - Usa Riverpod para gestión de estado                          │
+└───────────────────────────┬─────────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                        DOMAIN LAYER                              │
+│  (Entities, Use Cases, Repository Interfaces)                   │
+│  - Contiene la lógica de negocio pura                          │
+│  - Define contratos (interfaces) para repositories              │
+│  - Entities: Modelos de dominio sin dependencias                │
+│  - Use Cases: Casos de uso específicos de la aplicación        │
+└───────────────────────────┬─────────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                         DATA LAYER                               │
+│  (Models, DataSources, Repository Implementations)              │
+│  - Implementa los contratos del dominio                         │
+│  - Se comunica con APIs externas (Supabase)                    │
+│  - Convierte entre Models (Data) y Entities (Domain)           │
+│  - Maneja errores y excepciones                                 │
+└─────────────────────────────────────────────────────────────────┘
+
+PRINCIPIOS APLICADOS:
+- Dependency Inversion: Las capas superiores no dependen de las inferiores
+- Single Responsibility: Cada clase tiene una única responsabilidad
+- Open/Closed: Abierto a extensión, cerrado a modificación
+- Separation of Concerns: Cada capa tiene responsabilidades bien definidas
+
+================================================================================
+                      2. ESTRUCTURA DEL PROYECTO
+================================================================================
+
+flutter_application_1/
+│
+├── lib/                          # Código fuente principal
+│   ├── main.dart                 # Punto de entrada de la aplicación
+│   │
+│   ├── core/                     # Funcionalidad compartida entre features
+│   │   ├── config/               # Configuración de la app (Supabase, etc.)
+│   │   ├── constants/            # Constantes globales
+│   │   ├── error/                # Manejo de errores y failures
+│   │   ├── services/             # Servicios compartidos
+│   │   ├── theme/                # Temas y estilos globales
+│   │   └── usecase/              # UseCase base abstracto
+│   │
+│   └── features/                 # Funcionalidades modulares
+│       ├── auth/                 # Autenticación y autorización
+│       ├── mascota/              # Gestión de mascotas
+│       ├── refugio/              # Gestión de refugios
+│       ├── solicitud/            # Sistema de adopciones
+│       ├── home/                 # Pantallas principales
+│       ├── profile/              # Perfiles de usuario
+│       ├── chat/                 # Sistema de mensajería
+│       └── map/                  # Geolocalización y mapas
+│
+├── vercel/                       # Deployment y páginas web
+│   ├── api/                      # Serverless functions
+│   └── public/                   # Páginas HTML estáticas
+│
+├── android/                      # Configuración Android
+├── ios/                          # Configuración iOS
+├── web/                          # Configuración Web
+├── linux/                        # Configuración Linux
+├── macos/                        # Configuración macOS
+├── windows/                      # Configuración Windows
+│
+├── test/                         # Tests unitarios y de integración
+├── pubspec.yaml                  # Dependencias y configuración del proyecto
+└── analysis_options.yaml         # Reglas de análisis estático
+
+================================================================================
+                        3. CORE - FUNCIONALIDAD COMPARTIDA
+================================================================================
+
+lib/core/
+│
+├── config/
+│   └── supabase_config.dart      # Inicialización de Supabase client
+│
+├── constants/
+│   ├── app_constants.dart        # Constantes de la aplicación
+│   └── api_constants.dart        # URLs y endpoints
+│
+├── error/
+│   ├── failures.dart             # Clases de errores personalizados
+│   └── exceptions.dart           # Excepciones de la aplicación
+│
+├── services/
+│   ├── storage_service.dart      # Manejo de almacenamiento local
+│   └── notification_service.dart # Servicio de notificaciones
+│
+├── theme/
+│   ├── app_theme.dart            # Tema principal de la app
+│   └── app_colors.dart           # Paleta de colores
+│
+└── usecase/
+    └── usecase.dart              # Clase abstracta base para use cases
+
+PROPÓSITO DE CORE:
+- Contener código reutilizable entre diferentes features
+- Evitar duplicación de código
+- Centralizar configuraciones y servicios compartidos
+- Definir abstracciones base (como UseCase)
+
+================================================================================
+                          4. FEATURES - MÓDULOS
+================================================================================
+
+Cada feature sigue la misma estructura de Clean Architecture:
+
+feature_name/
+├── data/
+│   ├── datasources/              # Fuentes de datos (APIs, BD local)
+│   ├── models/                   # DTOs - Data Transfer Objects
+│   └── repositories/             # Implementación de repositories
+│
+├── domain/
+│   ├── entities/                 # Modelos de dominio puros
+│   ├── repositories/             # Interfaces de repositories
+│   └── usecases/                 # Casos de uso de negocio
+│
+└── presentation/
+    ├── pages/                    # Pantallas completas
+    ├── widgets/                  # Componentes reutilizables
+    └── providers/                # State management con Riverpod
+
+================================================================================
+                      4.1 FEATURE: AUTH (Autenticación)
+================================================================================
+
+lib/features/auth/
+│
+├── data/
+│   ├── datasources/
+│   │   └── auth_remote_datasource.dart
+│   │       - Comunicación con Supabase Auth
+│   │       - Métodos: signIn, signUp, signOut, getCurrentUser, resetPassword
+│   │       - Maneja tokens y sesiones
+│   │
+│   ├── models/
+│   │   └── user_model.dart
+│   │       - Modelo de datos para usuario
+│   │       - Conversión JSON ↔ Model
+│   │       - Métodos: fromJson(), toJson(), toEntity()
+│   │
+│   └── repositories/
+│       └── auth_repository_impl.dart
+│           - Implementa AuthRepository del dominio
+│           - Usa AuthDataSource para operaciones
+│           - Convierte Models a Entities
+│           - Maneja errores y devuelve Either<Failure, T>
+│
+├── domain/
+│   ├── entities/
+│   │   └── user_entity.dart
+│   │       - Entidad pura de usuario (sin dependencias externas)
+│   │       - Propiedades: id, email, userType, emailVerified
+│   │
+│   ├── repositories/
+│   │   └── auth_repository.dart
+│   │       - Interfaz/contrato para AuthRepository
+│   │       - Define métodos abstractos que debe implementar la capa data
+│   │
+│   └── usecases/
+│       ├── sign_in_usecase.dart          # Iniciar sesión
+│       ├── sign_up_usecase.dart          # Registrar usuario
+│       ├── sign_out_usecase.dart         # Cerrar sesión
+│       ├── get_current_user_usecase.dart # Obtener usuario actual
+│       └── reset_password_usecase.dart   # Recuperar contraseña
+│
+└── presentation/
+    ├── pages/
+    │   ├── login_screen.dart             # Pantalla de inicio de sesión
+    │   ├── register_screen.dart          # Pantalla de registro
+    │   ├── forgot_password_screen.dart   # Recuperación de contraseña
+    │   └── select_user_type_screen.dart  # Selección de tipo de usuario
+    │
+    └── providers/
+        └── auth_providers.dart            # Providers Riverpod
+            - authRepositoryProvider: Inyección de dependencias
+            - authStateProvider: Estado de autenticación
+            - Manejo de sesión persistente
+
+FLUJO DE AUTENTICACIÓN:
+1. Usuario ingresa credenciales en login_screen.dart
+2. Screen usa authStateProvider para ejecutar login
+3. Provider llama a SignInUseCase
+4. UseCase ejecuta repository.signIn()
+5. Repository llama a datasource.signIn()
+6. DataSource hace request a Supabase
+7. Respuesta se convierte: JSON → Model → Entity
+8. Entity se devuelve a través de las capas hasta el UI
+9. UI actualiza basándose en el resultado (éxito/error)
+
+================================================================================
+                      4.2 FEATURE: MASCOTA (Gestión de Mascotas)
+================================================================================
+
+lib/features/mascota/
+│
+├── data/
+│   ├── datasources/
+│   │   └── mascota_datasource.dart
+│   │       - CRUD de mascotas en Supabase
+│   │       - getMascotasByRefugio(): Lista de mascotas por refugio
+│   │       - createMascota(): Crear nueva mascota
+│   │       - updateMascota(): Actualizar mascota existente
+│   │       - deleteMascota(): Eliminar mascota
+│   │       - uploadFotos(): Subir fotos a Supabase Storage
+│   │
+│   ├── models/
+│   │   └── mascota_model.dart
+│   │       - DTO para transferencia de datos
+│   │       - Campos: id, nombre, especie, raza, edad, genero, etc.
+│   │       - fromJson(), toJson(), toEntity()
+│   │
+│   └── repositories/
+│       └── mascota_repository_impl.dart
+│           - Implementa MascotaRepository
+│           - Orquesta operaciones de datasource
+│           - Manejo de errores con Either<Failure, T>
+│
+├── domain/
+│   ├── entities/
+│   │   └── mascota_entity.dart
+│   │       - Entidad de dominio pura
+│   │       - Propiedades: id, nombre, especie, edad, estado, fotos, etc.
+│   │       - Sin lógica de persistencia
+│   │
+│   ├── repositories/
+│   │   └── mascota_repository.dart
+│   │       - Interfaz del repositorio
+│   │       - Contrato para operaciones CRUD
+│   │
+│   └── usecases/
+│       ├── get_mascotas_usecase.dart      # Obtener lista de mascotas
+│       ├── create_mascota_usecase.dart    # Crear nueva mascota
+│       ├── update_mascota_usecase.dart    # Actualizar mascota
+│       └── delete_mascota_usecase.dart    # Eliminar mascota
+│
+└── presentation/
+    ├── pages/
+    │   ├── add_mascota_screen.dart        # Formulario de nueva mascota
+    │   ├── edit_mascota_screen.dart       # Edición de mascota
+    │   ├── mascota_detail_adoptante_screen.dart  # Vista detallada (adoptante)
+    │   └── mascota_detail_refugio_screen.dart    # Vista detallada (refugio)
+    │
+    ├── widgets/
+    │   ├── mascota_card_widget.dart       # Tarjeta de mascota
+    │   └── mascota_form_widget.dart       # Formulario reutilizable
+    │
+    └── providers/
+        └── mascota_providers.dart
+            - mascotaRepositoryProvider: Inyección del repository
+            - mascotasDisponiblesProvider: Lista de mascotas disponibles
+            - mascotasCountProvider: Contadores por estado
+            - Usa .autoDispose para datos frescos
+
+ESTADOS DE MASCOTA:
+- "disponible": Mascota disponible para adopción
+- "adoptado": Mascota ya adoptada
+- "en_proceso": Solicitud de adopción en curso
+
+================================================================================
+                      4.3 FEATURE: REFUGIO (Gestión de Refugios)
+================================================================================
+
+lib/features/refugio/
+│
+├── data/
+│   ├── datasources/
+│   │   └── refugio_datasource.dart
+│   │       - getRefugioByUserId(): Obtener refugio por ID de usuario
+│   │       - createRefugio(): Crear perfil de refugio
+│   │       - updateRefugio(): Actualizar datos del refugio
+│   │
+│   ├── models/
+│   │   └── refugio_model.dart
+│   │       - DTO del refugio
+│   │       - Campos: id, nombre, direccion, telefono, userId, etc.
+│   │
+│   └── repositories/
+│       └── refugio_repository_impl.dart
+│           - Implementa RefugioRepository
+│           - Convierte Models ↔ Entities
+│
+├── domain/
+│   ├── entities/
+│   │   └── refugio_entity.dart
+│   │       - Entidad de dominio del refugio
+│   │       - Propiedades: id, nombre, direccion, stats
+│   │
+│   ├── repositories/
+│   │   └── refugio_repository.dart
+│   │       - Contrato del repositorio
+│   │
+│   └── usecases/
+│       ├── get_refugio_usecase.dart       # Obtener datos del refugio
+│       └── update_refugio_usecase.dart    # Actualizar refugio
+│
+└── presentation/
+    └── providers/
+        └── refugio_providers.dart
+            - refugioRepositoryProvider
+            - refugioByUserProvider: Obtiene refugio del usuario actual
+
+================================================================================
+                    4.4 FEATURE: SOLICITUD (Sistema de Adopciones)
+================================================================================
+
+lib/features/solicitud/
+│
+├── data/
+│   ├── datasources/
+│   │   └── solicitud_datasource.dart
+│   │       - createSolicitud(): Crear solicitud de adopción
+│   │       - getSolicitudesByAdoptante(): Solicitudes de un adoptante
+│   │       - getSolicitudesByRefugio(): Solicitudes para un refugio
+│   │       - updateSolicitudEstado(): Cambiar estado (aprobar/rechazar)
+│   │       - Constraint UNIQUE(mascota_id, adoptante_id)
+│   │
+│   ├── models/
+│   │   └── solicitud_model.dart
+│   │       - DTO de solicitud
+│   │       - Incluye nombres de mascota y refugio (fetch separado)
+│   │       - Estados: pendiente, aprobada, rechazada
+│   │
+│   └── repositories/
+│       └── solicitud_repository_impl.dart
+│           - Implementa SolicitudRepository
+│           - Orquesta creación y consultas
+│
+├── domain/
+│   ├── entities/
+│   │   └── solicitud_entity.dart
+│   │       - Entidad de solicitud de adopción
+│   │       - Campos: id, adoptanteId, mascotaId, refugioId, estado, fechas
+│   │
+│   ├── repositories/
+│   │   └── solicitud_repository.dart
+│   │       - Contrato del repositorio
+│   │
+│   └── usecases/
+│       ├── create_solicitud_usecase.dart  # Crear solicitud
+│       ├── get_solicitudes_usecase.dart   # Obtener solicitudes
+│       └── update_solicitud_usecase.dart  # Actualizar estado
+│
+└── presentation/
+    ├── pages/
+    │   ├── mis_solicitudes_screen.dart     # Solicitudes del adoptante
+    │   │   - Búsqueda por nombre de mascota
+    │   │   - Filtros: Todas, Pendientes, Aprobadas
+    │   │   - Pull-to-refresh
+    │   │   - Tarjetas con foto, nombre, estado, fecha
+    │   │
+    │   ├── notificaciones_screen.dart      # Notificaciones de estados
+    │   │   - Lista de cambios de estado
+    │   │   - Mensajes personalizados por estado
+    │   │   - Iconos y colores según estado
+    │   │
+    │   └── solicitudes_refugio_screen.dart # Panel del refugio
+    │       - Ver todas las solicitudes
+    │       - Filtros por estado y búsqueda
+    │       - Botones de aprobar/rechazar
+    │       - Diálogos de confirmación
+    │
+    └── providers/
+        ├── solicitud_providers.dart
+        │   - solicitudRepositoryProvider
+        │   - solicitudesByAdoptanteProvider.autoDispose  # Lista de adoptante
+        │   - solicitudesByRefugioProvider.autoDispose    # Lista de refugio
+        │   - solicitudesPendientesCountProvider.autoDispose  # Contador
+        │   - autoDispose: Garantiza datos frescos de Supabase
+        │
+        └── update_solicitud_provider.dart
+            - StateNotifier para aprobar/rechazar
+            - Actualiza estado de solicitud
+            - Marca mascota como "adoptado" si se aprueba
+
+FLUJO DE SOLICITUD DE ADOPCIÓN:
+1. Adoptante ve mascota en home_adoptante_screen
+2. Presiona "Solicitar adopción"
+3. Se crea solicitud con estado "pendiente"
+4. Refugio ve solicitud en panel de solicitudes
+5. Refugio puede aprobar o rechazar:
+   - Aprobar: solicitud → "aprobada", mascota → "adoptado"
+   - Rechazar: solicitud → "rechazada"
+6. Adoptante ve cambio en notificaciones y mis_solicitudes
+7. Mascota aprobada desaparece de disponibles
+
+ESTADOS DE SOLICITUD:
+- "pendiente": Esperando respuesta del refugio
+- "aprobada": Refugio aprobó la adopción
+- "rechazada": Refugio rechazó la solicitud
+
+================================================================================
+                        4.5 FEATURE: HOME (Pantallas Principales)
+================================================================================
+
+lib/features/home/
+│
+└── presentation/
+    ├── pages/
+    │   ├── home_adoptante_screen.dart
+    │   │   - Pantalla principal del adoptante
+    │   │   - Header con saludo y notificaciones
+    │   │   - Búsqueda de mascotas
+    │   │   - Filtros por especie (Todos, Perros, Gatos, Conejos, Aves, Otros)
+    │   │   - Grid de mascotas disponibles
+    │   │   - Pull-to-refresh
+    │   │   - Bottom navigation: Inicio, Mapa, Chat IA, Solicitudes, Perfil
+    │   │   - Filtra mascotas ya solicitadas
+    │   │
+    │   └── home_refugio_screen.dart
+    │       - Pantalla principal del refugio
+    │       - Header con datos del refugio
+    │       - Estadísticas: Total mascotas, Pendientes, Adoptadas
+    │       - Solicitudes recientes (2 últimas pendientes)
+    │       - Lista de mascotas del refugio
+    │       - Bottom navigation: Inicio, Mascotas, Solicitudes, Perfil
+    │       - Pull-to-refresh
+    │
+    └── widgets/
+        ├── adoptante/
+        │   ├── home_header_widget.dart     # Header con notificaciones
+        │   └── mascota_card_widget.dart    # Tarjeta de mascota
+        │
+        ├── refugio/
+        │   ├── refugio_header_widget.dart  # Header del refugio
+        │   ├── refugio_stats_section_widget.dart      # Estadísticas en tiempo real
+        │   ├── refugio_solicitudes_section_widget.dart # Solicitudes recientes
+        │   ├── refugio_mascotas_section_widget.dart   # Lista de mascotas
+        │   └── mascotas_page_widget.dart   # Página completa de mascotas
+        │
+        └── shared/
+            └── bottom_nav_widget.dart      # Navigation bar compartido
+
+DIFERENCIAS ENTRE ROLES:
+- ADOPTANTE: Ve mascotas disponibles, solicita adopciones, sigue estado
+- REFUGIO: Gestiona sus mascotas, recibe y procesa solicitudes
+
+================================================================================
+                        4.6 FEATURE: PROFILE (Perfiles)
+================================================================================
+
+lib/features/profile/
+│
+└── presentation/
+    ├── pages/
+    │   └── profile_screen.dart
+    │       - Pantalla de perfil de usuario
+    │       - Información personal
+    │       - Configuraciones
+    │       - Cerrar sesión
+    │
+    └── widgets/
+        ├── profile_header_widget.dart      # Header del perfil
+        └── profile_option_widget.dart      # Opciones de configuración
+
+================================================================================
+                        4.7 FEATURE: CHAT (Chat IA - Placeholder)
+================================================================================
+
+lib/features/chat/
+│
+├── data/
+│   ├── datasources/
+│   │   └── chat_datasource.dart           # API de chat IA (futuro)
+│   │
+│   ├── models/
+│   │   └── message_model.dart             # Modelo de mensaje
+│   │
+│   └── repositories/
+│       └── chat_repository_impl.dart      # Implementación
+│
+├── domain/
+│   ├── entities/
+│   │   └── message_entity.dart            # Entidad de mensaje
+│   │
+│   ├── repositories/
+│   │   └── chat_repository.dart           # Contrato
+│   │
+│   └── usecases/
+│       └── send_message_usecase.dart      # Enviar mensaje
+│
+└── presentation/
+    └── pages/
+        └── chat_screen.dart                # Pantalla de chat (placeholder)
+
+NOTA: Esta feature está preparada para futura integración con IA.
+
+================================================================================
+                        4.8 FEATURE: MAP (Mapas - Placeholder)
+================================================================================
+
+lib/features/map/
+│
+├── data/
+│   ├── datasources/
+│   │   └── location_datasource.dart       # Geolocalización
+│   │
+│   ├── models/
+│   │   └── location_model.dart            # Modelo de ubicación
+│   │
+│   └── repositories/
+│       └── map_repository_impl.dart       # Implementación
+│
+├── domain/
+│   ├── entities/
+│   │   └── location_entity.dart           # Entidad de ubicación
+│   │
+│   ├── repositories/
+│   │   └── map_repository.dart            # Contrato
+│   │
+│   └── usecases/
+│       └── get_nearby_refugios_usecase.dart  # Refugios cercanos
+│
+└── presentation/
+    └── pages/
+        └── map_screen.dart                 # Mapa interactivo (placeholder)
+
+NOTA: Esta feature está preparada para mostrar refugios en mapa.
+
+================================================================================
+                        5. GESTIÓN DE ESTADO CON RIVERPOD
+================================================================================
+
+ESTRATEGIA DE PROVIDERS:
+
+1. PROVIDER (sin estado)
+   - Para inyección de dependencias
+   - Ejemplo: authRepositoryProvider, mascotaRepositoryProvider
+   - No cambia durante el ciclo de vida de la app
+
+2. FUTUREPROVIDER (asíncrono)
+   - Para operaciones asíncronas que devuelven Future
+   - Ejemplo: solicitudesByAdoptanteProvider
+   - Estados: loading, data, error
+   - .family: Para providers parametrizados
+   - .autoDispose: Limpia cache automáticamente
+
+3. STATENOTIFIERPROVIDER (estado mutable)
+   - Para estado que cambia frecuentemente
+   - Ejemplo: updateSolicitudStateProvider
+   - Permite actualizar estado desde la UI
+
+PATRÓN autoDispose:
+- Usado en providers de datos que cambian frecuentemente
+- Garantiza que siempre se obtienen datos frescos de Supabase
+- Se invalida automáticamente cuando no hay listeners
+- Ejemplo:
+  ```dart
+  final solicitudesByAdoptanteProvider =
+      FutureProvider.family.autoDispose<List<SolicitudEntity>, String>((
+    ref,
+    adoptanteId,
+  ) async {
+    // Siempre consulta Supabase
+    final repository = ref.read(solicitudRepositoryProvider);
+    final result = await repository.getSolicitudesByAdoptante(adoptanteId);
+    return result.fold((failure) => [], (solicitudes) => solicitudes);
+  });
+  ```
+
+INVALIDACIÓN MANUAL:
+- ref.invalidate(provider): Fuerza recarga de datos
+- Usado en RefreshIndicator y después de mutaciones
+- Ejemplo: después de crear solicitud, invalidar lista de solicitudes
+
+================================================================================
+                        6. BASE DE DATOS SUPABASE
+================================================================================
+
+TABLAS PRINCIPALES:
+
+1. usuarios
+   - id (UUID, PK)
+   - email (TEXT, UNIQUE)
+   - user_type (TEXT) - 'adoptante' o 'refugio'
+   - email_verified (BOOLEAN)
+   - created_at (TIMESTAMP)
+
+2. refugios
+   - id (UUID, PK)
+   - user_id (UUID, FK → usuarios.id)
+   - nombre (TEXT)
+   - direccion (TEXT)
+   - telefono (TEXT)
+   - descripcion (TEXT)
+   - foto_perfil (TEXT)
+   - created_at (TIMESTAMP)
+
+3. mascotas
+   - id (UUID, PK)
+   - refugio_id (UUID, FK → refugios.id)
+   - nombre (TEXT)
+   - especie (TEXT) - 'perro', 'gato', 'conejo', 'ave', 'otro'
+   - raza (TEXT)
+   - edad_meses (INTEGER)
+   - genero (TEXT) - 'macho', 'hembra'
+   - tamano (TEXT) - 'pequeno', 'mediano', 'grande'
+   - color (TEXT)
+   - descripcion (TEXT)
+   - estado (TEXT) - 'disponible', 'adoptado', 'en_proceso'
+   - foto_urls (TEXT[])
+   - created_at (TIMESTAMP)
+
+4. solicitudes
+   - id (UUID, PK)
+   - adoptante_id (UUID, FK → usuarios.id)
+   - mascota_id (UUID, FK → mascotas.id)
+   - refugio_id (UUID, FK → refugios.id)
+   - estado (TEXT) - 'pendiente', 'aprobada', 'rechazada'
+   - notas_aprobacion (TEXT)
+   - fecha_solicitud (TIMESTAMP)
+   - fecha_aprobacion (TIMESTAMP)
+   - CONSTRAINT: UNIQUE(mascota_id, adoptante_id)
+
+STORAGE:
+- Bucket: mascotas-fotos
+  - Almacena fotos de mascotas
+  - Política pública de lectura
+  - Uploads autenticados
+
+AUTENTICACIÓN:
+- Supabase Auth con email/password
+- Verificación de email con templates personalizados
+- Reset de contraseña con token PKCE
+- Deep links para app móvil
+
+RLS (Row Level Security):
+- Policies configuradas para cada tabla
+- Los usuarios solo ven/editan sus propios datos
+- Los refugios gestionan sus mascotas
+- Los adoptantes ven todas las mascotas disponibles
+
+================================================================================
+                        7. FLUJO DE DATOS COMPLETO
+================================================================================
+
+EJEMPLO: CREAR SOLICITUD DE ADOPCIÓN
+
+1. UI LAYER (Presentation)
+   ├─ Usuario presiona botón "Solicitar adopción" en MascotaDetailScreen
+   ├─ Widget llama a ref.read(solicitudStateProvider.notifier).createSolicitud()
+   └─ Provider muestra loading en UI
+
+2. PROVIDER LAYER
+   ├─ solicitudStateProvider ejecuta createSolicitud()
+   ├─ Obtiene repository: ref.read(solicitudRepositoryProvider)
+   └─ Llama a repository.createSolicitud(params)
+
+3. DOMAIN LAYER
+   ├─ SolicitudRepository (interface) define el contrato
+   └─ No hay lógica, solo abstracción
+
+4. DATA LAYER
+   ├─ SolicitudRepositoryImpl implementa el método
+   ├─ Llama a dataSource.createSolicitud()
+   ├─ DataSource hace POST a Supabase
+   ├─ Supabase valida UNIQUE constraint
+   ├─ Devuelve JSON con la solicitud creada
+   ├─ Se convierte JSON → Model → Entity
+   └─ Se devuelve Either<Failure, SolicitudEntity>
+
+5. VUELTA A UI
+   ├─ Provider recibe resultado (éxito o error)
+   ├─ Actualiza estado del provider
+   ├─ Invalida listas relacionadas (mascotas, solicitudes)
+   ├─ UI se reconstruye automáticamente (ref.watch)
+   └─ Muestra snackbar de confirmación o error
+
+VENTAJAS DE ESTE FLUJO:
+- Separación clara de responsabilidades
+- Fácil de testear cada capa independientemente
+- Cambiar implementación (ej: de Supabase a Firebase) solo afecta Data Layer
+- UI no conoce detalles de implementación
+- Lógica de negocio centralizada en Domain
+
+================================================================================
+                        8. DEPENDENCIAS PRINCIPALES
+================================================================================
+
+CORE:
+- flutter_riverpod: ^2.4.9        # State management
+- supabase_flutter: ^2.0.0        # Backend as a Service
+- dartz: ^0.10.1                  # Functional programming (Either)
+
+UI:
+- cached_network_image: ^3.3.0    # Caché de imágenes
+- image_picker: ^1.0.4            # Selección de fotos
+
+UTILIDADES:
+- intl: ^0.18.0                   # Formateo de fechas
+- url_launcher: ^6.2.1            # Abrir URLs externas
+
+DEV:
+- flutter_lints: ^3.0.0           # Reglas de código
+- flutter_test: SDK               # Testing
+
+================================================================================
+                        9. DEPLOYMENT Y WEB
+================================================================================
+
+VERCEL DEPLOYMENT:
+
+vercel/
+├── api/
+│   └── config.js
+│       - Serverless function
+│       - Expone variables de entorno (Supabase URL y Key)
+│       - Usado por páginas HTML para inicializar Supabase
+│
+└── public/
+    ├── reset-password.html
+    │   - Página de reset de contraseña
+    │   - Verifica token PKCE con verifyOtp()
+    │   - Permite cambiar contraseña
+    │   - Deep link de regreso a la app
+    │
+    └── verify-email.html
+        - Página de verificación de email
+        - Verifica token_hash con verifyOtp()
+        - Confirma email del usuario
+        - Deep link de regreso a la app
+
+CONFIGURACIÓN:
+- vercel.json: Rutas y rewrites
+- Variables de entorno en Vercel Dashboard:
+  * SUPABASE_URL
+  * SUPABASE_ANON_KEY
+
+DEEP LINKS:
+- petadopt://verified - Abrir app después de verificar email
+- petadopt://reset - Abrir app después de reset password
+
+================================================================================
+                        10. BUENAS PRÁCTICAS IMPLEMENTADAS
+================================================================================
+
+1. CLEAN ARCHITECTURE
+   ✓ Separación en 3 capas (Presentation, Domain, Data)
+   ✓ Dependency Inversion (capas superiores no conocen inferiores)
+   ✓ Entities y Use Cases sin dependencias externas
+
+2. SOLID PRINCIPLES
+   ✓ Single Responsibility: Cada clase una sola responsabilidad
+   ✓ Open/Closed: Extensible sin modificar código existente
+   ✓ Liskov Substitution: Interfaces bien definidas
+   ✓ Interface Segregation: Interfaces específicas
+   ✓ Dependency Inversion: Depender de abstracciones
+
+3. STATE MANAGEMENT
+   ✓ Riverpod para gestión de estado declarativa
+   ✓ autoDispose para evitar cache obsoleto
+   ✓ FutureProvider para operaciones asíncronas
+   ✓ StateNotifier para estado mutable
+
+4. ERROR HANDLING
+   ✓ Either<Failure, T> para manejo de errores funcional
+   ✓ Try-catch en todas las operaciones de red
+   ✓ Logging con print() para debug
+   ✓ Mensajes de error claros para el usuario
+
+5. UI/UX
+   ✓ Pull-to-refresh en listas
+   ✓ Loading states claros
+   ✓ Snackbars para feedback
+   ✓ Diálogos de confirmación para acciones críticas
+   ✓ Búsqueda y filtros en listas grandes
+
+6. PERFORMANCE
+   ✓ Caché de imágenes con cached_network_image
+   ✓ autoDispose para liberar recursos
+   ✓ Lazy loading de datos
+   ✓ Consultas optimizadas a Supabase
+
+7. SEGURIDAD
+   ✓ Row Level Security en Supabase
+   ✓ Validación de tokens en backend
+   ✓ HTTPS obligatorio
+   ✓ Sanitización de inputs
+
+================================================================================
+                        11. PATRONES DE DISEÑO UTILIZADOS
+================================================================================
+
+1. REPOSITORY PATTERN
+   - Abstrae el acceso a datos
+   - Permite cambiar fuente de datos sin afectar UI
+
+2. DEPENDENCY INJECTION
+   - Providers de Riverpod para inyectar dependencias
+   - Facilita testing con mocks
+
+3. FACTORY PATTERN
+   - Métodos factory en Models: fromJson(), toEntity()
+   - Creación de objetos estandarizada
+
+4. SINGLETON PATTERN
+   - Supabase client (instancia única)
+   - Providers de Riverpod (instancia compartida)
+
+5. OBSERVER PATTERN
+   - Riverpod observa cambios de estado
+   - UI se reconstruye automáticamente
+
+6. STRATEGY PATTERN
+   - Diferentes estrategias de providers (autoDispose, family)
+   - Comportamiento intercambiable
+
+7. ADAPTER PATTERN
+   - Models adaptan JSON a Entities
+   - Conversión entre capas
+
+================================================================================
+                        12. TESTING (ESTRUCTURA PREPARADA)
+================================================================================
+
+test/
+├── unit/
+│   ├── domain/
+│   │   └── usecases/                 # Test de casos de uso
+│   └── data/
+│       ├── models/                   # Test de conversión JSON
+│       └── repositories/             # Test de lógica de repositorio
+│
+├── widget/
+│   └── presentation/                 # Test de widgets individuales
+│
+└── integration/
+    └── features/                     # Test de flujos completos
+
+ESTRATEGIA DE TESTING:
+- Unit tests: Lógica de negocio (Use Cases)
+- Widget tests: Componentes de UI
+- Integration tests: Flujos end-to-end
+- Mocks con Mockito para dependencies
+
+================================================================================
+                        13. ROADMAP Y MEJORAS FUTURAS
+================================================================================
+
+CORTO PLAZO:
+- [ ] Implementar chat IA con adoptantes
+- [ ] Mapa interactivo de refugios cercanos
+- [ ] Sistema de favoritos para mascotas
+- [ ] Notificaciones push
+
+MEDIANO PLAZO:
+- [ ] Sistema de reviews/ratings de refugios
+- [ ] Galería de fotos mejorada con zoom
+- [ ] Filtros avanzados (edad, tamaño, características)
+- [ ] Historial de adopciones
+
+LARGO PLAZO:
+- [ ] App para veterinarias asociadas
+- [ ] Sistema de donaciones
+- [ ] Eventos de adopción
+- [ ] Comunidad de adoptantes
+
+MEJORAS TÉCNICAS:
+- [ ] Tests automatizados (unit, widget, integration)
+- [ ] CI/CD con GitHub Actions
+- [ ] Monitoreo con Firebase Analytics
+- [ ] Crash reporting con Sentry
+- [ ] Internacionalización (i18n)
+
+================================================================================
+                        14. CONVENCIONES DE CÓDIGO
+================================================================================
+
+NOMENCLATURA:
+- Clases: PascalCase (ej: MascotaEntity)
+- Archivos: snake_case (ej: mascota_entity.dart)
+- Variables: camelCase (ej: mascotaId)
+- Constantes: camelCase con const (ej: const defaultPadding = 16.0)
+
+ESTRUCTURA DE ARCHIVOS:
+- Imports de Flutter primero
+- Luego imports de packages
+- Finalmente imports relativos del proyecto
+- Separados por línea en blanco
+
+COMENTARIOS:
+- /// Para documentación de clases y métodos públicos
+- // Para explicaciones inline
+- TODO: Para tareas pendientes
+
+GIT:
+- Commits descriptivos en español
+- Feature branches para nuevas funcionalidades
+- Pull requests para revisión
+
+================================================================================
+                        15. CONTACTO Y CRÉDITOS
+================================================================================
+
+PROYECTO: PetAdopt
+VERSIÓN: 1.0.0
+ARQUITECTURA: Clean Architecture + Riverpod
+BACKEND: Supabase
+DEPLOYMENT: Vercel (páginas web)
+
+CARACTERÍSTICAS PRINCIPALES:
+- Sistema de autenticación completo
+- Gestión de mascotas con fotos
+- Solicitudes de adopción con estados
+- Panel de administración para refugios
+- Notificaciones en tiempo real
+- Arquitectura escalable y mantenible
+
+DOCUMENTACIÓN ACTUALIZADA: 6 de Enero, 2026
+
+================================================================================
+                              FIN DEL DOCUMENTO
+================================================================================

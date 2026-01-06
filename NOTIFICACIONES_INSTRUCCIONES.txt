@@ -1,0 +1,112 @@
+=================================================================
+        CONFIGURACIÓN DE NOTIFICACIONES PUSH - PETADOPT
+=================================================================
+
+PASOS PARA ACTIVAR LAS NOTIFICACIONES:
+
+1. INSTALAR DEPENDENCIAS
+   Ejecuta en la terminal:
+   
+   cd c:\Users\Santy\Desktop\Movil\Prueba3\flutter_application_1
+   flutter pub get
+
+2. ACTIVAR REALTIME EN SUPABASE
+   - Ve a tu proyecto en Supabase Dashboard
+   - Navega a Database → Replication
+   - Asegúrate de que la tabla "solicitudes" tenga Realtime activado
+   - Si no está activa, haz clic en el botón para activarla
+
+3. PROBAR LA FUNCIONALIDAD
+
+   FLUJO DE PRUEBA:
+   a) Login como adoptante en el teléfono 1
+   b) Solicitar adopción de una mascota
+   c) Login como refugio en el teléfono 2 (o computadora)
+   d) Aprobar o rechazar la solicitud
+   e) El teléfono 1 recibirá una notificación push automáticamente
+
+4. PERMISOS EN ANDROID 13+
+   - La app solicitará permisos de notificaciones en primera ejecución
+   - Si los deniegaste, ve a: Ajustes → Aplicaciones → PetAdopt → Permisos → Notificaciones
+
+=================================================================
+                      CÓMO FUNCIONA
+=================================================================
+
+1. SUPABASE REALTIME:
+   - Escucha cambios en la tabla "solicitudes"
+   - Filtra solo las solicitudes del usuario actual
+   - Detecta cuando cambia el campo "estado"
+
+2. NOTIFICACIONES LOCALES:
+   - Cuando detecta cambio de "pendiente" → "aprobada": 
+     Notificación verde con mensaje de éxito
+   
+   - Cuando detecta cambio de "pendiente" → "rechazada":
+     Notificación roja con mensaje de rechazo
+
+3. EN TIEMPO REAL:
+   - No necesita que el usuario esté en la app
+   - Funciona incluso si la app está en segundo plano
+   - Las notificaciones aparecen instantáneamente
+
+=================================================================
+                    ARCHIVOS CREADOS
+=================================================================
+
+1. lib/core/services/notification_service.dart
+   - Servicio singleton para notificaciones locales
+   - Métodos: showApprovedNotification(), showRejectedNotification()
+   - Configuración de canales Android e iOS
+
+2. lib/core/services/solicitud_realtime_service.dart
+   - Listener de Supabase Realtime
+   - Detecta cambios en solicitudes
+   - Dispara notificaciones según el estado
+
+3. Actualizaciones:
+   - pubspec.yaml: Agregadas dependencias de notificaciones
+   - main.dart: Inicialización del servicio
+   - home_adoptante_screen.dart: Inicia listener automáticamente
+   - AndroidManifest.xml: Permisos de notificaciones
+
+=================================================================
+                     SOLUCIÓN DE PROBLEMAS
+=================================================================
+
+PROBLEMA: No recibo notificaciones
+SOLUCIÓN:
+1. Verifica que Realtime esté activo en Supabase
+2. Revisa permisos de notificaciones en el teléfono
+3. Mira los logs de Flutter: flutter logs
+
+PROBLEMA: Error al instalar dependencias
+SOLUCIÓN:
+1. Ejecuta: flutter clean
+2. Luego: flutter pub get
+3. Rebuild: flutter run
+
+PROBLEMA: Notificaciones no aparecen en iOS
+SOLUCIÓN:
+1. Configura push notifications en Xcode
+2. Agrega capability: Background Modes → Remote notifications
+3. Configura APNs en Apple Developer
+
+=================================================================
+                     PRÓXIMOS PASOS
+=================================================================
+
+MEJORAS FUTURAS:
+- [ ] Notificaciones push con Firebase Cloud Messaging
+- [ ] Notificaciones programadas (recordatorios)
+- [ ] Badges en el icono de la app
+- [ ] Sonidos personalizados por tipo de notificación
+- [ ] Acciones directas desde la notificación
+
+PARA PRODUCCIÓN:
+- Configurar certificados push en iOS
+- Configurar Firebase Cloud Messaging
+- Implementar backend para envío masivo
+- Analytics de notificaciones entregadas/abiertas
+
+=================================================================

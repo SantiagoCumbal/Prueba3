@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'core/theme/app_theme.dart';
 import 'core/config/supabase_config.dart';
+import 'core/services/notification_service.dart';
 import 'features/auth/presentation/pages/login_screen.dart';
 
 Future<void> main() async {
@@ -14,6 +15,15 @@ Future<void> main() async {
     debugPrint('✅ Supabase inicializado correctamente');
   } catch (e) {
     debugPrint('❌ Error inicializando Supabase: $e');
+  }
+
+  // Inicializar servicio de notificaciones
+  try {
+    await NotificationService().initialize();
+    await NotificationService().requestPermissions();
+    debugPrint('✅ Servicio de notificaciones inicializado');
+  } catch (e) {
+    debugPrint('❌ Error inicializando notificaciones: $e');
   }
 
   runApp(const ProviderScope(child: MyApp()));

@@ -13,6 +13,8 @@ import '../../../profile/presentation/pages/profile_screen.dart';
 import '../../../chat/presentation/pages/chat_screen.dart';
 import '../../../map/presentation/pages/map_screen.dart';
 import '../../../solicitud/presentation/pages/mis_solicitudes_screen.dart';
+import '../../../../core/services/solicitud_realtime_service.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class HomeAdoptanteScreen extends ConsumerStatefulWidget {
   const HomeAdoptanteScreen({super.key});
@@ -26,6 +28,27 @@ class _HomeAdoptanteScreenState extends ConsumerState<HomeAdoptanteScreen> {
   int _selectedIndex = 0;
   String _selectedCategory = 'Todos';
   String _searchQuery = '';
+  final _realtimeService = SolicitudRealtimeService();
+
+  @override
+  void initState() {
+    super.initState();
+    _startRealtimeListener();
+  }
+
+  @override
+  void dispose() {
+    _realtimeService.stopListening();
+    super.dispose();
+  }
+
+  /// Iniciar listener de notificaciones en tiempo real
+  void _startRealtimeListener() {
+    final userId = Supabase.instance.client.auth.currentUser?.id;
+    if (userId != null) {
+      _realtimeService.startListening(userId);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
